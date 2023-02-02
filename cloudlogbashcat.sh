@@ -87,71 +87,7 @@ while true; do
 
 			# Close FD 3
 			exec 3>&-
-			;;
 
-		flrig)
-			# Get flrig frequency ...
-			rpcxml=$(generateRequestXml "rig.get_vfo")
-			rigFreq=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/text()' - 2>&1)
-
-			if [[ $? -ne 0 ]]; then
-				echo "Unable to contact server" >&2
-				exit 1
-			fi
-
-			# Get flrig mode ...
-			rpcxml=$(generateRequestXml "rig.get_mode")
-			rigMode=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/text()' -)
-			;;
-
-		fldigi)
-			# Get flrig frequency ...
-			rpcxml=$(generateRequestXml "main.get_frequency")
-			rigFreq=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/double/text()' - 2>&1)
-			# freq is delivered as double: 14189860.000000, change format
-			rigFreq=${rigFreq%.*}
-
-			if [[ $? -ne 0 ]]; then
-			    echo "Unable to contact server" >&2
-			    exit 1
-			fi
-
-			# Get flrig mode ...
-			rpcxml=$(generateRequestXml "rig.get_mode")
-			rigMode=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/text()' -)
-			case $rigMode in
-			# CWR, RTTYR, etc is not supported by Cloudlog
-			    CWR)
-				rigMode="CW"
-				;;
-			    USB)
-				rigMode="SSB"
-				;;
-			    LSB)
-				rigMode="SSB"
-				;;
-			    PKTUSB)
-				rigMode="PSK"
-				;;
-			    PKTLSB)
-				rigMode="PSK"
-				;;
-			    RTTYR)
-			    rigMode="RTTY"
-			    ;;
-			esac
-			;;
-		sparksdr)
-			rigMode=$(rigctl -r $host:$port -m2 m)
-			rigFreq=$(rigctl -r $host:$port -m2 f)
-			
-			IFS='-' read -ra  IP <<< "$rigMode"
-			for rigMode in "${IP[@]}";
-# sonst läuft es nicht
-			do
-			    echo "" >/dev/null
-			done
-			# sparksdr delivers not all modes, try to guess them
 			if [ "$rigMode"="" ]; then 
 			    case $rigFreq in
 				136000)
@@ -244,17 +180,8 @@ while true; do
 			    esac
 			fi    
 			
-			rigMode=$(echo $rigMode|tr -d '\n')
-			case $rigMode in
-			    CWR)
-				rigMode="CW"
-				;;
-			    USB)
-				rigMode="SSB"
-				;;
-			    LSB)
-				rigMode="SSB"
-				;;
+		if [ "$rigMode" = "" ]; then 
+			case $rigWidth in
 			    280)
 				rigMode="WSPR"
 				;;
@@ -271,7 +198,64 @@ while true; do
 				rigMode="FM"
 				;;
 			    44000)
-				rigMode="USB"
+				rigMode="HL2-DATA"
+				;;
+			    *)
+				rigMode="CW"
+				;;
+    			esac
+		else
+			case $rigMode in
+			    PKTUSB)
+				rigMode="HL2-DATA"
+				;;
+			    PKTLSB)
+				rigMode="HL2-DATA"
+				;;
+			esac
+		fi
+		;;
+
+		flrig)
+			# Get flrig frequency ...
+			rpcxml=$(generateRequestXml "rig.get_vfo")
+			rigFreq=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/text()' - 2>&1)
+
+			if [[ $? -ne 0 ]]; then
+				echo "Unable to contact server" >&2
+				exit 1
+			fi
+
+			# Get flrig mode ...
+			rpcxml=$(generateRequestXml "rig.get_mode")
+			rigMode=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/text()' -)
+			;;
+
+		fldigi)
+			# Get flrig frequency ...
+			rpcxml=$(generateRequestXml "main.get_frequency")
+			rigFreq=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/double/text()' - 2>&1)
+			# freq is delivered as double: 14189860.000000, change format
+			rigFreq=${rigFreq%.*}
+
+			if [[ $? -ne 0 ]]; then
+			    echo "Unable to contact server" >&2
+			    exit 1
+			fi
+
+			# Get flrig mode ...
+			rpcxml=$(generateRequestXml "rig.get_mode")
+			rigMode=$(curl -k $verbose --data "$rpcxml" "$host:$port" 2>/dev/null | xmllint --format --xpath '//value/text()' -)
+			case $rigMode in
+			# CWR, RTTYR, etc is not supported by Cloudlog
+			    CWR)
+				rigMode="CW"
+				;;
+			    USB)
+				rigMode="SSB"
+				;;
+			    LSB)
+				rigMode="SSB"
 				;;
 			    PKTUSB)
 				rigMode="PSK"
@@ -279,7 +263,10 @@ while true; do
 			    PKTLSB)
 				rigMode="PSK"
 				;;
-    			esac
+			    RTTYR)
+			    rigMode="RTTY"
+			    ;;
+			esac
 			;;
 
 		*)
